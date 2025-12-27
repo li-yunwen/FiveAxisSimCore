@@ -129,7 +129,7 @@ class Sdfer:
         # Floor block_id
         block_id = xp.floor(
             (self.pts - bmin + self.pitch / 2) / self.block_size
-        ).astype(int)
+        ).astype(xp.int64) # Unify windows int32 and linux int64 before bitwise hash
         # Compress 3D integer block_id into a single hash key
         key = (block_id[:, 0] << 40) + (block_id[:, 1] << 20) + block_id[:, 2]
         # Sort by key and record start and end indices

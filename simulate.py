@@ -1,5 +1,4 @@
 import numpy as np
-import cupy as cp
 import open3d as o3d
 from cutter import BaseCutter, TapperCutter, CylinderCutter, BallCutter
 from utils.logger import Logger
@@ -104,7 +103,7 @@ class Simulator:
                         cutter_sdf = cutter.get_sdfer(
                             as_xp_array(wp_cut.pts), origin, direction, shape=wp_cut.shape
                         )
-                        plot_multiple_sdfer([wp_cut, cutter_sdf], opacities=[0.9])
+                        plot_multiple_sdfer([wp_cut, cutter_sdf], opacities=[0.9], colors=['lightgrey', 'red'], legends=['Workpiece', 'Cutter SDF'])
                     except Exception as e:
                         print(f"[warn] Visualization skipped: {e}")
 
@@ -119,7 +118,7 @@ class Simulator:
         chip_voxel_list: (N,) int
         """
         import pyvista as pv
-        trajectory = cp.asnumpy(trajectory) if GPU_ENABLED else trajectory
+        trajectory = xp.asnumpy(trajectory)
         chip_voxel_list = np.asarray(chip_voxel_list)
         chip_volume_list = chip_voxel_list * (pitch ** 3)
 
@@ -156,5 +155,5 @@ if __name__ == "__main__":
     sdfer_cut, chip_voxel_list = sim.run(traj, vis_interval=10)
 
     # Results visualization
-    plot_multiple_sdfer([sdf_original, sdfer_cut], opacities=[0.1, 1], colors = ['lightgrey', 'lightgrey'])
+    plot_multiple_sdfer([sdf_original, sdfer_cut], opacities=[0.1, 1], colors = ['lightgrey', 'lightgrey'], legends=['Original', 'Cut'])
     sim.visualize_chip_volume_3d(traj[:, :3], chip_voxel_list, pitch=PITCH)
