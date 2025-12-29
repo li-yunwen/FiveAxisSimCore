@@ -19,11 +19,11 @@ class Simulator:
         cutter: BaseCutter,
         workpiece_mesh: o3d.geometry.TriangleMesh,
         pitch: DTYPE_FLOAT = 0.2,
-        block_size: DTYPE_FLOAT = 1.0,
+        block_size_in_pitch: int = 5,
     ):
         self.cutter = cutter
         self.sdfer_workpiece = Sdfer.from_mesh(
-            workpiece_mesh, pitch=pitch, block_size=block_size
+            workpiece_mesh, pitch=pitch, block_size_in_pitch=block_size_in_pitch
         )
         self.pitch = pitch
         self.logger = Logger("Simulator")
@@ -144,14 +144,14 @@ if __name__ == "__main__":
     cutter = BallCutter(radius=0.5, length=8.0)
     mesh = o3d.geometry.TriangleMesh.create_box(width=10, height=10, depth=5)
     mesh.translate((-5, -5, -2.5))
-    sdf_original = Sdfer.from_mesh(mesh, pitch=PITCH, block_size=PITCH * 10)
+    sdf_original = Sdfer.from_mesh(mesh, pitch=PITCH, block_size_in_pitch=10)
 
     traj_file = f"assets/gcode/test.ncc"
     with open(traj_file, "r", encoding="utf-8") as fp:
         traj = GCodeReader.load(fp)
         traj = as_xp_array(traj)
 
-    sim = Simulator(cutter, mesh, pitch=PITCH, block_size=PITCH * 10)
+    sim = Simulator(cutter, mesh, pitch=PITCH, block_size_in_pitch=10)
     sdfer_cut, chip_voxel_list = sim.run(traj, vis_interval=10)
 
     # Results visualization

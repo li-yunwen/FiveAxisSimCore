@@ -86,7 +86,7 @@ class BaseCutter:
         r = xp.sqrt(xp.maximum(r2, 0))
 
         # Effective expanded radius = block half diagonal
-        block_r = sdfer_workpiece.block_size * xp.sqrt(3) / 2
+        block_r = sdfer_workpiece.block_size_in_pitch * sdfer_workpiece.pitch * xp.sqrt(3) / 2
         mask_block = (
             (h >= -margin - block_r) &
             (h <= L + margin + block_r) &
@@ -216,7 +216,7 @@ if __name__ == "__main__":
     pitch = 0.1
     mesh = o3d.geometry.TriangleMesh.create_box(width=8, height=8, depth=8)
     mesh.translate([-4, -4, 0])
-    sdfer_workpiece = Sdfer.from_mesh(mesh, pitch, block_size=4*pitch)
+    sdfer_workpiece = Sdfer.from_mesh(mesh, pitch, block_size_in_pitch=4)
 
     sdfer_cutter = cutter.get_sdfer(
         sdfer_workpiece.pts,

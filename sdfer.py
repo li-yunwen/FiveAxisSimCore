@@ -18,7 +18,7 @@ class Sdfer:
         sdf_flat: np.ndarray,
         shape: tuple[int] | None = None,
         pitch: DTYPE_FLOAT | None = None,
-        block_size: DTYPE_FLOAT | None = None,
+        block_size_in_pitch: int | None = None,
     ):
         """
         Parameters:
@@ -31,8 +31,8 @@ class Sdfer:
             If provided, used for visualization reshape, order='F', (nx,ny,nz)
         pitch : DTYPE_FLOAT, optional
             Voxel edge length (used for subsequent calculations).
-        block_size : DTYPE_FLOAT, optional
-            Block size for block indexing (used to accelerate local clipping).
+        block_size_in_pitch : int, optional
+            Block size (in pitch units) for block indexing (used to accelerate local clipping).
         """
         assert pts_flat.ndim == 2 and pts_flat.shape[1] == 3, (
             "pts_flat shape must be (N, 3)"
@@ -53,11 +53,11 @@ class Sdfer:
         if pitch is not None:
             self.pitch = DTYPE_FLOAT(pitch)
 
-        if block_size is not None:
-            if not (block_size / self.pitch).is_integer():
-                logger.error("block_size must be an integer multiple of pitch")
+        if block_size_in_pitch is not None:
+            if not isinstance(block_size_in_pitch, int) or block_size_in_pitch <= 0:
+                logger.error("block_size_in_pitch must be a positive integer")
                 raise SystemExit
-            self.block_size = DTYPE_FLOAT(block_size)
+            self.block_size_in_pitch = block_size_in_pitch
             self._build_block_index()
 
     # ======== Factory method 1: Generate from mesh ========
@@ -66,7 +66,7 @@ class Sdfer:
         cls,
         mesh: o3d.geometry.TriangleMesh,
         pitch: DTYPE_FLOAT = 0.5,
-        block_size: DTYPE_FLOAT | None = None,
+        block_size_in_pitch: int | None = None,
     ):
         """
         从 Open3D mesh 生成符号距离场（自动检测 GPU）
@@ -102,7 +102,7 @@ class Sdfer:
         )  # Open3D RaycastingScene only supports CPU
         sdf_flat = scene.compute_signed_distance(pts_t).numpy().ravel(order="F")
 
-        obj = cls(pts_flat, sdf_flat, shape=dims, pitch=pitch, block_size=block_size)
+        obj = cls(pts_flat, sdf_flat, shape=dims, pitch=pitch, block_size_in_pitch=block_size_in_pitch)
 
         return obj
 
@@ -114,9 +114,9 @@ class Sdfer:
         sdf_flat: xp.ndarray,
         shape: tuple[int] | None = None,
         pitch: DTYPE_FLOAT | None = None,
-        block_size: DTYPE_FLOAT | None = None,
+        block_size_in_pitch: int | None = None,
     ):
-        return cls(pts_flat, sdf_flat, shape, pitch=pitch, block_size=block_size)
+        return cls(pts_flat, sdf_flat, shape, pitch=pitch, block_size_in_pitch=block_size_in_pitch)
 
     def deactivate_outer_volume(self):
         """Mark SDF outer voxels as inactive"""
@@ -128,7 +128,7 @@ class Sdfer:
         bmin = self.bmin
         # Floor block_id
         block_id = xp.floor(
-            (self.pts - bmin + self.pitch / 2) / self.block_size
+            (self.pts - bmin + self.pitch / 2) / (self.block_size_in_pitch * self.pitch)
         ).astype(xp.int64) # Unify windows int32 and linux int64 before bitwise hash
         # Compress 3D integer block_id into a single hash key
         key = (block_id[:, 0] << 40) + (block_id[:, 1] << 20) + block_id[:, 2]
@@ -143,7 +143,7 @@ class Sdfer:
         self.block_starts = idx_start
         self.block_counts = counts
         # Cache the center point and AABB half-length of each block
-        bsize = DTYPE_FLOAT(self.block_size)
+        bsize = DTYPE_FLOAT(self.block_size_in_pitch * self.pitch)
         ix = (uniq_keys >> 40) & ((1 << 20) - 1)
         iy = (uniq_keys >> 20) & ((1 << 20) - 1)
         iz = uniq_keys & ((1 << 20) - 1)
@@ -165,8 +165,9 @@ class Sdfer:
 
         # ------- Calculate integer coordinate range of hit blocks -------
         bmin = self.bmin
-        block_min = xp.floor((origin - r - bmin) / self.block_size).astype(xp.int64)
-        block_max = xp.floor((origin + r - bmin) / self.block_size).astype(xp.int64)
+        bsize = self.block_size_in_pitch * self.pitch
+        block_min = xp.floor((origin - r - bmin) / bsize).astype(xp.int64)
+        block_max = xp.floor((origin + r - bmin) / bsize).astype(xp.int64)
 
         # Note: if r is very small, the three arange may have only 1 element
         bx = xp.arange(
@@ -387,7 +388,7 @@ if __name__ == "__main__":
 
     # Block index self-test
     test_box = o3d.geometry.TriangleMesh.create_box(width=4, height=4, depth=4)
-    sdf_test = Sdfer.from_mesh(test_box, pitch=0.5, block_size=0.5 * 2)
+    sdf_test = Sdfer.from_mesh(test_box, pitch=0.5, block_size_in_pitch=2)
 
     center = xp.mean(sdf_test.pts, axis=0)
     radius = 1
@@ -405,7 +406,7 @@ if __name__ == "__main__":
     pts_sub = xp.asnumpy(sdf_test.pts[idx_test])
     center_np = xp.asnumpy(center)
     bmin_np = xp.asnumpy(sdf_test.bmin)
-    bsize = float(sdf_test.block_size)
+    bsize = float(sdf_test.block_size_in_pitch * sdf_test.pitch)
     k = xp.asnumpy(sdf_test.block_keys)
     ix = (k >> 40) & ((1 << 20) - 1)
     iy = (k >> 20) & ((1 << 20) - 1)
@@ -421,7 +422,7 @@ if __name__ == "__main__":
     iz = k & ((1 << 20) - 1)
 
     bmin_np = xp.asnumpy(sdf_test.bmin)
-    bsize = float(sdf_test.block_size)
+    bsize = float(sdf_test.block_size_in_pitch * sdf_test.pitch)
 
     for i in range(len(ix)):
         c = bmin_np + np.array([ix[i], iy[i], iz[i]], dtype=float) * bsize + bsize / 2
