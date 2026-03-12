@@ -8,6 +8,121 @@ Cupy: use `nvidia-sim` to check the correct cupy version for your GPU, and modif
 
 ---
 
+## Usage
+
+### Quick start
+
+Run the built-in end-to-end demo (loads the sample G-code, builds a box workpiece, runs a ball-end cutting simulation and visualises the result):
+
+```bash
+python simulate.py
+```
+
+### Step-by-step API
+
+#### 1. Parse a G-code file into a trajectory matrix
+
+```python
+from utils.gcode_reader import GCodeReader
+
+with open("assets/gcode/test.ncc", "r", encoding="utf-8") as fp:
+    trajectory = GCodeReader.load(fp)
+# trajectory: float64 ndarray of shape (N, 6)
+# columns: [X, Y, Z, I, J, K]  (position + tool-axis direction)
+```
+
+#### 2. Create a workpiece mesh
+
+Any `open3d.geometry.TriangleMesh` is accepted. You can load a file or build a primitive:
+
+```python
+import open3d as o3d
+
+# Primitive box (width × height × depth in mm, centred at the origin)
+mesh = o3d.geometry.TriangleMesh.create_box(width=10, height=10, depth=5)
+mesh.translate((-5, -5, -2.5))
+
+# Or load from a file (STL, OBJ, PLY, …)
+# mesh = o3d.io.read_triangle_mesh("workpiece.stl")
+```
+
+#### 3. Choose a cutter
+
+| Class | Parameters | Description |
+|-------|-----------|-------------|
+| `BallCutter` | `radius`, `length` | Ball-end (hemispherical tip + cylindrical shank) |
+| `TapperCutter` | `radius_base`, `radius_tip`, `length` | Linearly tapered flat-bottom cutter (`radius_base ≥ radius_tip`) |
+| `CylinderCutter` | `radius`, `length` | Flat-bottom cylindrical cutter |
+
+```python
+from cutter import BallCutter, TapperCutter, CylinderCutter
+
+cutter = BallCutter(radius=0.5, length=8.0)
+# cutter = TapperCutter(radius_base=0.5, radius_tip=0.2, length=8.0)
+# cutter = CylinderCutter(radius=0.5, length=8.0)
+```
+
+#### 4. Create a `Simulator` and run the simulation
+
+```python
+from simulate import Simulator
+from utils.backend import as_xp_array
+
+# pitch         – voxel edge length (mm). Smaller = finer detail, more memory/time.
+# block_size_in_pitch – voxels per block side for spatial acceleration (≥ 1).
+sim = Simulator(cutter, mesh, pitch=0.1, block_size_in_pitch=10)
+
+traj = as_xp_array(trajectory)  # move to GPU if CuPy is active
+
+# vis_interval – render an intermediate view every N steps (set to 0 to disable).
+workpiece_sdf, chip_voxel_list = sim.run(traj, vis_interval=500)
+```
+
+`run()` returns:
+
+| Return value | Type | Description |
+|---|---|---|
+| `workpiece_sdf` | `Sdfer` | Updated workpiece signed-distance field after all cuts |
+| `chip_voxel_list` | `list[int]` | Number of voxels removed at each trajectory step |
+
+#### 5. Convert chip counts to chip volume
+
+```python
+pitch = 0.1  # mm (must match the value passed to Simulator)
+chip_volume_mm3 = [n * pitch**3 for n in chip_voxel_list]
+```
+
+#### 6. Visualise results
+
+```python
+from sdfer import plot_multiple_sdfer
+
+# Compare original and cut workpiece side-by-side
+from sdfer import Sdfer
+sdf_original = Sdfer.from_mesh(mesh, pitch=0.1, block_size_in_pitch=10)
+plot_multiple_sdfer(
+    [sdf_original, workpiece_sdf],
+    opacities=[0.1, 1.0],
+    colors=["lightgrey", "lightgrey"],
+    legends=["Original", "Cut"],
+)
+
+# 3-D chip-volume heat map along the trajectory
+sim.visualize_chip_volume_3d(traj[:, :3], chip_voxel_list, pitch=0.1)
+```
+
+### Configuration
+
+Edit `config.py` to tune global settings:
+
+| Variable | Default | Description |
+|---|---|---|
+| `FLOAT_TYPE_NAME` | `"float32"` | Floating-point precision. `"float32"` is faster on GPU; use `"float64"` for higher accuracy. |
+| `PITCH_DEFAULT` | `0.5` | Fallback voxel edge length (mm) used when `pitch` is not passed explicitly. |
+| `USE_GPU` | `True` | Set to `False` to force NumPy/CPU mode even when a CUDA GPU is available. |
+
+---
+
 ## Algorithm Summary
 
 FiveAxisSimCore simulates 5-axis CNC cutting by tracking how a moving cutting tool removes material from a workpiece. The core representation is a **Signed Distance Field (SDF)** voxel grid, and all operations—from workpiece initialization to per-step material removal—are expressed as SDF updates.
