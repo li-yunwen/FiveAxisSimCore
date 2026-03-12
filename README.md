@@ -8,7 +8,7 @@ Cupy: use `nvidia-sim` to check the correct cupy version for your GPU, and modif
 
 ---
 
-## Usage
+## Usage (written by Copilot)
 
 ### Quick start
 
@@ -117,13 +117,13 @@ Edit `config.py` to tune global settings:
 
 | Variable | Default | Description |
 |---|---|---|
-| `FLOAT_TYPE_NAME` | `"float32"` | Floating-point precision. `"float32"` is faster on GPU; use `"float64"` for higher accuracy. |
+| `FLOAT_TYPE_NAME` | `"float32"` | Floating-point precision. `"float32"` is recommended. |
 | `PITCH_DEFAULT` | `0.5` | Fallback voxel edge length (mm) used when `pitch` is not passed explicitly. |
 | `USE_GPU` | `True` | Set to `False` to force NumPy/CPU mode even when a CUDA GPU is available. |
 
 ---
 
-## Algorithm Summary
+## Algorithm Summary (summarized by Copilot)
 
 FiveAxisSimCore simulates 5-axis CNC cutting by tracking how a moving cutting tool removes material from a workpiece. The core representation is a **Signed Distance Field (SDF)** voxel grid, and all operations—from workpiece initialization to per-step material removal—are expressed as SDF updates.
 
