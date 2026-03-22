@@ -111,14 +111,14 @@ class Simulator:
 
         return wp_cut, chip_voxel_list
     
-    def visualize_chip_volume_3d(self, trajectory: np.ndarray, chip_voxel_list: list[int], pitch: float = 0.1):
+    def visualize_chip_volume_3d(self, trajectory: xp.ndarray, chip_voxel_list: list[int], pitch: float = 0.1):
         """
         Visualize the chip volume at each trajectory point using PyVista.
         trajectory: (N, 3)
         chip_voxel_list: (N,) int
         """
         import pyvista as pv
-        trajectory = xp.asnumpy(trajectory)
+        trajectory = xp.asnumpy(trajectory) if GPU_ENABLED else trajectory
         chip_voxel_list = np.asarray(chip_voxel_list)
         chip_volume_list = chip_voxel_list * (pitch ** 3)
 
@@ -152,7 +152,7 @@ if __name__ == "__main__":
         traj = as_xp_array(traj)
 
     sim = Simulator(cutter, mesh, pitch=PITCH, block_size_in_pitch=10)
-    sdfer_cut, chip_voxel_list = sim.run(traj, vis_interval=10)
+    sdfer_cut, chip_voxel_list = sim.run(traj, vis_interval=1000)
 
     # Results visualization
     plot_multiple_sdfer([sdf_original, sdfer_cut], opacities=[0.1, 1], colors = ['lightgrey', 'lightgrey'], legends=['Original', 'Cut'])
