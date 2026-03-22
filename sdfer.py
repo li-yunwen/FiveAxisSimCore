@@ -227,10 +227,14 @@ class Sdfer:
             ix = (k >> 40) & ((1 << 20) - 1)
             iy = (k >> 20) & ((1 << 20) - 1)
             iz = k & ((1 << 20) - 1)
+            if GPU_ENABLED:
+                ix = xp.asnumpy(ix)
+                iy = xp.asnumpy(iy)
+                iz = xp.asnumpy(iz)
             print(
                 f"[get_block_indices] blocks_hit={int(hit_blocks.size)}, "
                 f"coarse_pts={int(cand_idx.size)}, "
-                f"sample_block_ids[0..]: ix={xp.asnumpy(ix)}, iy={xp.asnumpy(iy)}, iz={xp.asnumpy(iz)}"
+                f"sample_block_ids[0..]: ix={ix}, iy={iy}, iz={iz}"
             )
 
         if not refine:
@@ -395,19 +399,19 @@ if __name__ == "__main__":
     idx_test, hit_blocks = sdf_test.get_block_indices(
         center, radius, refine=False, debug=True
     )
-    hit_keys = xp.asnumpy(sdf_test.block_keys[hit_blocks])
+    hit_keys = xp.asnumpy(sdf_test.block_keys[hit_blocks]) if GPU_ENABLED else sdf_test.block_keys[hit_blocks]
 
     print(
         f"[BlockIndex Test] total={len(sdf_test.pts)}, blocks={len(sdf_test.block_keys)}, candidates={len(idx_test)}"
     )
 
     # ---- Prepare visualization data ----
-    pts_all = xp.asnumpy(sdf_test.pts)
-    pts_sub = xp.asnumpy(sdf_test.pts[idx_test])
-    center_np = xp.asnumpy(center)
-    bmin_np = xp.asnumpy(sdf_test.bmin)
+    pts_all = xp.asnumpy(sdf_test.pts) if GPU_ENABLED else sdf_test.pts
+    pts_sub = xp.asnumpy(sdf_test.pts[idx_test]) if GPU_ENABLED else sdf_test.pts[idx_test]
+    center_np = xp.asnumpy(center) if GPU_ENABLED else center
+    bmin_np = xp.asnumpy(sdf_test.bmin) if GPU_ENABLED else sdf_test.bmin
     bsize = float(sdf_test.block_size_in_pitch * sdf_test.pitch)
-    k = xp.asnumpy(sdf_test.block_keys)
+    k = xp.asnumpy(sdf_test.block_keys) if GPU_ENABLED else sdf_test.block_keys
     ix = (k >> 40) & ((1 << 20) - 1)
     iy = (k >> 20) & ((1 << 20) - 1)
     iz = k & ((1 << 20) - 1)
@@ -416,12 +420,12 @@ if __name__ == "__main__":
     cubes_hit = []
     cubes_rest = []
 
-    k = xp.asnumpy(sdf_test.block_keys)
+    k = xp.asnumpy(sdf_test.block_keys) if GPU_ENABLED else sdf_test.block_keys
     ix = (k >> 40) & ((1 << 20) - 1)
     iy = (k >> 20) & ((1 << 20) - 1)
     iz = k & ((1 << 20) - 1)
 
-    bmin_np = xp.asnumpy(sdf_test.bmin)
+    bmin_np = xp.asnumpy(sdf_test.bmin) if GPU_ENABLED else sdf_test.bmin
     bsize = float(sdf_test.block_size_in_pitch * sdf_test.pitch)
 
     for i in range(len(ix)):

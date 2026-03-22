@@ -91,7 +91,7 @@ class Simulator:
             for i, row in enumerate(trajectory):
                 x, y, z, i_, j_, k_ = row
                 origin = xp.array([x, y, z])
-                direction = xp.array([i_, j_, k_])
+                direction = xp.array([i_, j_, k_]) / xp.linalg.norm(xp.array([i_, j_, k_]))
 
                 num_chip_voxels = cutter.cut_inplace(
                     wp_cut, origin, direction, margin=self.pitch * 4
